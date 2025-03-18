@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 libc = "0.2.171"
 mach2 = "0.4.2"
+raw-cpuid = "11.5.0"

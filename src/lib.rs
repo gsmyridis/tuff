@@ -1,5 +1,11 @@
 pub mod metrics;
-pub use metrics::cpu::get_timestamp_counter;
+pub use metrics::{
+    cpu::{get_timestamp_counter, get_timestamp_counter_frequency},
+    os::{get_tick_frequency, get_time},
+};
+
+pub mod detection;
+pub use detection::has_counter_support;
 
 pub struct Profiler {
     start: u64,
