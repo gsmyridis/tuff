@@ -1,11 +1,17 @@
+## Time stamp counter
 
 
 
+### `RDTSC` & `RDTSCP`
 
-`RDTSC` & `RDTSCP`
 
+### `mach_absolute_time`
 
-`mach_absolute_time()`
+`x86_64`
+
+```shell
+otool -tv /usr/lib/system/libsystem_kernel.dylib | grep "_mach_absolute_time:" -A 24
+```
 
 ```asm
 0000000000001271        pushq   %rbp
@@ -34,3 +40,44 @@
 00000000000012ba        addb    %al, (%rax)
 ```
 
+`AARCH64`
+
+```shell
+otool -tv /usr/lib/system/libsystem_kernel.dylib | grep "_mach_absolute_time:" -A 33
+```
+
+```asm
+0000000000001378        movk    x3, #0x0, lsl #48
+000000000000137c        movk    x3, #0xf, lsl #32
+0000000000001380        movk    x3, #0xffff, lsl #16
+0000000000001384        movk    x3, #0xc088
+0000000000001388        ldrb    w2, [x3, #0x8]
+000000000000138c        cmp     x2, #0x0
+0000000000001390        b.eq    _mach_absolute_time_kernel
+0000000000001394        cmp     x2, #0x2
+0000000000001398        b.eq    0x13c4
+000000000000139c        cmp     x2, #0x3
+00000000000013a0        b.eq    0x13e0
+00000000000013a4        isb
+00000000000013a8        ldr     x1, [x3]
+00000000000013ac        mrs     x0, CNTVCT_EL0
+00000000000013b0        ldr     x2, [x3]
+00000000000013b4        cmp     x1, x2
+00000000000013b8        b.ne    0x13a8
+00000000000013bc        add     x0, x0, x1
+00000000000013c0        ret
+00000000000013c4        ldr     x1, [x3]
+00000000000013c8        mrs     x0, CNTVCTSS_EL0
+00000000000013cc        ldr     x2, [x3]
+00000000000013d0        cmp     x1, x2
+00000000000013d4        b.ne    0x13c4
+00000000000013d8        add     x0, x0, x1
+00000000000013dc        ret
+00000000000013e0        ldr     x1, [x3]
+00000000000013e4        mrs     x0, S3_4_C15_C10_6
+00000000000013e8        ldr     x2, [x3]
+00000000000013ec        cmp     x1, x2
+00000000000013f0        b.ne    0x13e0
+00000000000013f4        add     x0, x0, x1
+00000000000013f8        ret
+```

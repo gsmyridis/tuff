@@ -1,7 +1,7 @@
 use zoomin::Profiler;
 
 #[test]
-fn test_simple() {
+fn test_profiler_simple() {
     let mut profiler = Profiler::new();
     profiler.register_start();
     // profile! {

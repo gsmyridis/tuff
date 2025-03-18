@@ -1,5 +1,5 @@
 pub mod metrics;
-pub use metrics::cpu::read_cpu_timer;
+pub use metrics::cpu::get_timestamp_counter;
 
 pub struct Profiler {
     start: u64,
@@ -12,11 +12,11 @@ impl Profiler {
     }
 
     pub fn register_start(&mut self) {
-        self.start = read_cpu_timer();
+        self.start = get_timestamp_counter();
     }
 
     pub fn register_end(&mut self) {
-        self.end = read_cpu_timer();
+        self.end = get_timestamp_counter();
     }
 
     pub fn duration(&self) -> u64 {
