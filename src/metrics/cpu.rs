@@ -19,7 +19,7 @@ pub fn get_timestamp_counter() -> u64 {
     {
         let mut cnt: u64;
         unsafe { core::arch::asm!("mrs {cnt}, CNTVCT_EL0", cnt = out(reg) cnt) };
-        return cnt;
+        cnt
     }
 
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]

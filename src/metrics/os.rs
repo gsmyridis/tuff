@@ -23,14 +23,10 @@ pub fn get_tick_frequency() -> f64 {
 }
 
 pub fn get_time() -> f64 {
-    let freq = get_tick_frequency();
-
     #[cfg(target_os = "macos")]
-    {
-        unsafe {
-            let time = mach_absolute_time() as f64;
-            return time * freq;
-        }
+    unsafe {
+        let freq = get_tick_frequency();
+        mach_absolute_time() as f64 * freq
     }
 }
 
