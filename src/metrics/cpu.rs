@@ -10,7 +10,7 @@ use core::arch::x86_64::_rdtsc;
 /// counts the number of cycles since the last reset.
 #[cfg(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64"))]
 #[inline]
-pub fn get_timestamp_counter() -> u64 {
+pub fn read_timestamp_counter() -> u64 {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     // TODO: Add serialization instructions or rdtscp.
     return unsafe { _rdtsc() };
@@ -43,14 +43,14 @@ mod tests {
 
     #[test]
     fn test_tsc_monotonic() {
-        let t1 = get_timestamp_counter();
-        let t2 = get_timestamp_counter();
+        let t1 = read_timestamp_counter();
+        let t2 = read_timestamp_counter();
         assert!(t2 >= t1, "TSC should be monotonic");
     }
 
     #[test]
     fn test_tsc_not_zero() {
-        let t = get_timestamp_counter();
+        let t = read_timestamp_counter();
         assert!(t > 0, "TSC should return a positive value");
     }
 

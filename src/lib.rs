@@ -1,31 +1,16 @@
+#![feature(trace_macros)]
+
 pub mod metrics;
 pub use metrics::{
-    cpu::{get_timestamp_counter, get_timestamp_counter_frequency},
+    cpu::{get_timestamp_counter_frequency, read_timestamp_counter},
     os::{get_tick_frequency, get_time},
 };
 
 pub mod detection;
 pub use detection::has_counter_support;
 
-pub struct Profiler {
-    start: u64,
-    end: u64,
-}
-
-impl Profiler {
-    pub fn new() -> Self {
-        Self { start: 0, end: 0 }
-    }
-
-    pub fn register_start(&mut self) {
-        self.start = get_timestamp_counter();
-    }
-
-    pub fn register_end(&mut self) {
-        self.end = get_timestamp_counter();
-    }
-
-    pub fn duration(&self) -> u64 {
-        self.end - self.start
-    }
-}
+#[macro_use]
+pub mod profile;
+pub use profile::{
+    get_total_counter, start_global_profiler, stop_global_profiler, Anchor, Block, Profiler,
+};

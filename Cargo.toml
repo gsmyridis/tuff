@@ -1,9 +1,22 @@
 [package]
-name = "zoomin"
+name = "tuff"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+readme = "README.md"
+
+[lib]
+name = "tuff"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tuff"
+path = "src/bin/main.rs"
 
 [dependencies]
 libc = "0.2.171"
 mach2 = "0.4.2"
 raw-cpuid = "11.5.0"
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }
+criterion = "0.5"
