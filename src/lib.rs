@@ -1,16 +1,14 @@
 #![feature(trace_macros)]
 
-pub mod metrics;
-pub use metrics::{
-    cpu::{get_timestamp_counter_frequency, read_timestamp_counter},
-    os::{get_tick_frequency, get_time},
-};
+pub mod arch;
+pub use arch::{read_cpu_counter, read_cpu_counter_frequency};
 
-pub mod detection;
-pub use detection::has_counter_support;
+pub mod metrics;
+pub use metrics::{Counter, Duration, Frequency, Instant};
+
+pub mod os;
+pub use os::read_os_time;
 
 #[macro_use]
 pub mod profile;
-pub use profile::{
-    get_total_counter, start_global_profiler, stop_global_profiler, Anchor, Block, Profiler,
-};
+pub use profile::{ProfileAnchor, ProfileBlock, Profiler};

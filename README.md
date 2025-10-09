@@ -1,9 +1,30 @@
 ## Time stamp counter
 
-
-
 ### `RDTSC` & `RDTSCP`
 
+## ARM
+
+Similarly on ARM there
+
+## MacOS
+
+For a long time `machTimestamp` has been in nanoseconds, so the Mach clock ticks occured once every nanosecond.
+However, with the new Apple Silicon Macs, this is not the case any more.
+The hardware clocks, Mach precision time, are affected by this change, but not local reference clocks.
+
+On intel processors, that tick has been one nanosecond long, so working out a time interval has been all too easy.
+
+What we should be doing is apply a conversion factor to the difference in clock ticks, to convert from ticks
+to nanoseconds.
+
+For MacOS the numerator and denominator of `mach_timebase_info` are the same, and have been omitted.
+The correction may be large and different from model to model.
+
+https://developer.apple.com/documentation/driverkit/mach_timebase_info_t
+https://developer.apple.com/library/archive/qa/qa1398/_index.html
+https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code
+https://eclecticlight.co/2020/09/08/changing-the-clock-in-apple-silicon-macs/
+https://eclecticlight.co/2017/02/23/so-many-times-the-clocks-in-your-mac/
 
 ### `mach_absolute_time`
 

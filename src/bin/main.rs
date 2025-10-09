@@ -1,12 +1,37 @@
-use tuff::{end_profiling, start_profiling, Block};
+use tuff::{read_os_time, ProfileBlock, Profiler};
 
 fn main() {
-    start_profiling!();
-    let mut v = Vec::new();
-    for i in 0..100_000_000 {
-        let block = Block::new("Body loop", 0);
-        v.push(i);
-        drop(block)
+    Profiler::start_global();
+
+    for _ in 0..10_000_000 {
+        tuff::profile_block! {["automatic_q", 1]
+            let _z = read_os_time();
+        };
     }
-    end_profiling!();
+
+    tuff::profile_block! {["some", 2]
+        let x = 10;
+        let _ = read_os_time();
+        let _ = read_os_time();
+    };
+
+    let _ = x;
+
+    for _ in 0..10_000_000 {
+        tuff::profile_block! {["automatic", 4]
+            let _x = std::time::Instant::now();
+        };
+    }
+
+    for _ in 0..10_000_000 {
+        let _x = ProfileBlock::new("os_time_mine", 5);
+        let _z = read_os_time();
+    }
+
+    for _ in 0..10_000_000 {
+        let _y = ProfileBlock::new("os_time", 6);
+        let _z = std::time::Instant::now();
+    }
+
+    Profiler::stop_global();
 }

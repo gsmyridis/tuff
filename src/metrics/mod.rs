@@ -1,5 +1,8 @@
-pub mod cpu;
-pub use cpu::read_timestamp_counter;
+pub mod time;
+pub use time::{Duration, Instant};
 
-pub mod os;
-pub use os::{get_tick_frequency, get_time};
+pub mod freq;
+pub use freq::Frequency;
+
+pub mod counter;
+pub use counter::Counter;

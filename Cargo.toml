@@ -12,11 +12,15 @@ path = "src/lib.rs"
 name = "tuff"
 path = "src/bin/main.rs"
 
+[features]
+default = []
+profiling = []
+
 [dependencies]
 libc = "0.2.171"
 mach2 = "0.4.2"
+paste = "1.0.15"
 raw-cpuid = "11.5.0"
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["full"] }
 criterion = "0.5"
