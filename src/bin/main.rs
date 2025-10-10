@@ -3,23 +3,14 @@ use tuff::{read_os_time, ProfileBlock, Profiler};
 fn main() {
     Profiler::start_global();
 
-    for _ in 0..10_000_000 {
+    for _ in 0..100_000 {
         tuff::profile_block! {["automatic_q", 1]
             let _z = read_os_time();
-        };
-    }
-
-    tuff::profile_block! {["some", 2]
-        let x = 10;
-        let _ = read_os_time();
-        let _ = read_os_time();
-    };
-
-    let _ = x;
-
-    for _ in 0..10_000_000 {
-        tuff::profile_block! {["automatic", 4]
-            let _x = std::time::Instant::now();
+            for _ in 0..1000 {
+                tuff::profile_block! {["automatic", 4]
+                    let _x = std::time::Instant::now();
+                };
+            }
         };
     }
 
@@ -34,4 +25,5 @@ fn main() {
     }
 
     Profiler::stop_global();
+    Profiler::report();
 }

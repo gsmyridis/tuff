@@ -17,7 +17,7 @@ use core::arch::x86_64::_rdtsc;
 #[inline]
 pub fn read_cpu_counter_frequency() -> u64 {
     #[cfg(target_arch = "aarch64")]
-    return unsafe { crate::arch::aarch64::_cntfrq_el0() };
+    return crate::arch::aarch64::cntfrq_el0();
 }
 
 /// Reads the CPU timer, or timestamp counter (TSC).
@@ -34,5 +34,5 @@ pub fn read_cpu_counter() -> u64 {
     return unsafe { _rdtsc() };
 
     #[cfg(target_arch = "aarch64")]
-    return unsafe { crate::arch::aarch64::_cntvct_el0() };
+    return crate::arch::aarch64::cntvct_el0();
 }

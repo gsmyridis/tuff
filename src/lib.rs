@@ -1,5 +1,3 @@
-#![feature(trace_macros)]
-
 pub mod arch;
 pub use arch::{read_cpu_counter, read_cpu_counter_frequency};
 
@@ -11,4 +9,4 @@ pub use os::read_os_time;
 
 #[macro_use]
 pub mod profile;
-pub use profile::{ProfileAnchor, ProfileBlock, Profiler};
+pub use profile::{ProfileBlock, Profiler};

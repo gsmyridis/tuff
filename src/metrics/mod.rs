@@ -6,3 +6,9 @@ pub use freq::Frequency;
 
 pub mod counter;
 pub use counter::Counter;
+
+pub enum Metric {
+    OsClock,
+    CpuCounter,
+    CpuCounterSerialized,
+}

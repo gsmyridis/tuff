@@ -30,14 +30,14 @@ impl Duration {
     }
 
     pub fn as_micros(&self) -> u64 {
-        (self.0 as f64 / NANOS_PER_MICRO as f64) as u64
+        self.0 / NANOS_PER_MICRO
     }
 
     pub fn as_millis(&self) -> u64 {
-        (self.0 as f64 / NANOS_PER_MILLI as f64) as u64
+        self.0 / NANOS_PER_MILLI
     }
 
     pub fn as_secs(&self) -> u64 {
-        (self.0 as f64 / NANOS_PER_SEC as f64) as u64
+        self.0 / NANOS_PER_SEC
     }
 }

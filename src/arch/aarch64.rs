@@ -1,11 +1,25 @@
-pub unsafe fn _cntfrq_el0() -> u64 {
+#[inline(always)]
+pub fn cntfrq_el0() -> u64 {
     let freq: u64;
-    core::arch::asm!("mrs {}, CNTFRQ_EL0", out(reg) freq);
+    unsafe {
+        core::arch::asm!(
+            "mrs {freq}, cntfrq_el0",
+            freq = lateout(reg) freq,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
     freq
 }
 
-pub unsafe fn _cntvct_el0() -> u64 {
-    let mut cnt: u64;
-    core::arch::asm!("mrs {cnt}, CNTVCT_EL0", cnt = out(reg) cnt);
+#[inline(always)]
+pub fn cntvct_el0() -> u64 {
+    let cnt: u64;
+    unsafe {
+        core::arch::asm!(
+            "mrs {cnt}, cntvct_el0",
+            cnt = lateout(reg) cnt,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
     cnt
 }
