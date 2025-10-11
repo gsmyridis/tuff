@@ -1,47 +1,66 @@
+use std::cell::RefCell;
+
 use crate::arch::read_cpu_counter;
+use crate::metrics::{Counter, Duration, MetricType, ProfileMetric};
+use crate::os::read_os_time;
+use crate::report::{Measurement, ProfileReport};
 
-const GLOBAL_PROFILER_SIZE: usize = 1024;
+const PROFILER_SIZE: usize = 1024;
 
-static mut GLOBAL_PROFILER: Profiler = Profiler::new("Global Profiler");
+thread_local! {
+    static THREAD_PROFILER: RefCell<Profiler> = const {RefCell::new(Profiler::new())};
+}
 
 pub struct Profiler {
-    label: &'static str,
-    anchors: [ProfileAnchor; GLOBAL_PROFILER_SIZE],
     current_open_block: usize,
+    anchors: [ProfileAnchor; PROFILER_SIZE],
+
+    metric_type: MetricType,
     metric_init: Option<u64>,
     metric_final: Option<u64>,
 }
 
 impl Profiler {
-    const fn new(label: &'static str) -> Self {
+    const fn new() -> Self {
         Self {
-            metric_init: Some(0),
-            anchors: [ProfileAnchor::new("Uninit"); GLOBAL_PROFILER_SIZE],
             current_open_block: 0,
+            anchors: [ProfileAnchor::new("Uninit"); PROFILER_SIZE],
+            metric_type: MetricType::OsClock,
+
+            metric_init: Some(0),
             metric_final: None,
-            label,
         }
     }
 
-    fn metric_elapsed_inclusive(anchor_index: usize) -> u64 {
-        unsafe { GLOBAL_PROFILER.anchors[anchor_index].elapsed_inclusive }
+    #[cfg(feature = "profiling")]
+    pub fn start_global(metric_type: MetricType) {
+        THREAD_PROFILER.with(|p| {
+            let mut profiler = p.borrow_mut();
+            profiler.metric_type = metric_type;
+            profiler.metric_init = Some(profiler.read_current_metric());
+        });
     }
 
-    #[cfg(feature = "profiling")]
-    pub fn start_global() {
-        unsafe { GLOBAL_PROFILER.metric_init = Some(read_cpu_counter()) }
+    #[inline(always)]
+    fn read_current_metric(&self) -> u64 {
+        match self.metric_type {
+            MetricType::OsClock => read_os_time(),
+            MetricType::CpuCounter => read_cpu_counter(),
+            MetricType::CpuCounterSerialized => todo!(),
+        }
     }
 
     #[cfg(not(feature = "profiling"))]
-    pub fn start_global() {
+    pub fn start_global(metric_type: MetricType) {
         // no-op
     }
 
     #[cfg(feature = "profiling")]
     pub fn stop_global() {
-        unsafe {
-            GLOBAL_PROFILER.metric_final = Some(read_cpu_counter());
-        }
+        THREAD_PROFILER.with(|p| {
+            let mut profiler = p.borrow_mut();
+            profiler.metric_final = Some(profiler.read_current_metric());
+        });
     }
 
     #[cfg(not(feature = "profiling"))]
@@ -50,54 +69,54 @@ impl Profiler {
     }
 
     #[cfg(feature = "profiling")]
-    pub fn report() {
-        let mut sum = 0_u64;
+    pub fn report() -> ProfileReport {
+        THREAD_PROFILER.with(|p| {
+            let profiler = p.borrow();
+            let into_metric = |value: u64| match profiler.metric_type {
+                MetricType::OsClock => ProfileMetric::OsClock(Duration::from_nanos(value)),
+                MetricType::CpuCounter | MetricType::CpuCounterSerialized => {
+                    ProfileMetric::CpuCounter(Counter::from_cycles(value))
+                }
+            };
 
-        unsafe {
-            let x = GLOBAL_PROFILER.label;
-            println!("Profiler: {x}");
+            let metric_init_value = profiler.metric_init.expect("Profiler not started");
+            let metric_final_value = profiler.metric_final.expect("Profiler not finished");
 
-            let metric_init = GLOBAL_PROFILER
-                .metric_init
-                .expect("Profiling did not begin");
-            let metric_final = GLOBAL_PROFILER
-                .metric_final
-                .expect("Profiling did not finish");
-            let total_metric = metric_final - metric_init;
-            println!("  - Total metric: {total_metric}");
+            let metric_init = into_metric(metric_init_value);
+            let metric_final = into_metric(metric_final_value);
 
-            for anchor in &GLOBAL_PROFILER.anchors[..] {
+            let mut report = ProfileReport::new(metric_init, metric_final);
+            for anchor in profiler.anchors.iter() {
                 if anchor.hit_count == 0 {
                     continue;
                 }
-
-                sum += anchor.elapsed_exclusive as u64;
-
-                // let average_metric = anchor.metric_elapsed_inclusive / anchor.hit_count;
-                let proportion_inclusive =
-                    anchor.elapsed_inclusive as f64 / total_metric as f64 * 100.0;
-                let proportion_exclusive =
-                    anchor.elapsed_exclusive as u64 as f64 / total_metric as f64 * 100.0;
-
-                println!("- {}", anchor.label);
-                println!("  - Total hit-count: {}", anchor.hit_count);
-                println!("  - Metric inclusive: {}", anchor.elapsed_inclusive);
-                println!("  - Proportion inclusive: {proportion_inclusive}");
-                println!("  - Metric exclusive: {}", anchor.elapsed_exclusive);
-                println!("  - Proportion exclusive: {proportion_exclusive}");
+                let stat = Measurement {
+                    label: anchor.label,
+                    hit_count: anchor.hit_count,
+                    elapsed_exclusive: into_metric(anchor.elapsed_exclusive as u64),
+                    elapsed_inclusive: into_metric(anchor.elapsed_inclusive),
+                    elapsed_min: into_metric(anchor.elapsed_min),
+                    elapsed_max: into_metric(anchor.elapsed_max),
+                };
+                report.push_measurement(stat);
             }
-            println!("{}", total_metric - sum);
-        }
+
+            report
+        })
     }
 
     #[cfg(not(feature = "profiling"))]
-    pub fn report() {
-        // no-op
+    pub fn report() -> ProfileReport {
+        ProfileReport::new(
+            ProfileMetric::CpuCounter(Counter::from_cycles(0)),
+            ProfileMetric::CpuCounter(Counter::from_cycles(0)),
+        )
     }
 }
 
+#[repr(align(64))]
 #[derive(Debug, Clone, Copy)]
-struct ProfileAnchor {
+pub(crate) struct ProfileAnchor {
     /// Label to identify the profile block.
     label: &'static str,
 
@@ -109,6 +128,12 @@ struct ProfileAnchor {
 
     /// Metric elapsed including children blocks.
     elapsed_inclusive: u64,
+
+    /// Minimum elapsed metric for single execution.
+    elapsed_min: u64,
+
+    /// Maximum elapsed metric for single execution.
+    elapsed_max: u64,
 }
 
 impl ProfileAnchor {
@@ -118,13 +143,14 @@ impl ProfileAnchor {
             hit_count: 0,
             elapsed_exclusive: 0,
             elapsed_inclusive: 0,
+            elapsed_min: u64::MAX,
+            elapsed_max: 0,
         }
     }
 }
 
 #[derive(Debug)]
 pub struct ProfileBlock {
-    label: &'static str,
     anchor_index: usize,
     parent_index: usize,
     start_counter: u64,
@@ -133,35 +159,45 @@ pub struct ProfileBlock {
 
 impl ProfileBlock {
     pub fn new(label: &'static str, anchor_index: usize) -> Self {
-        unsafe {
-            let parent_index = GLOBAL_PROFILER.current_open_block;
-            GLOBAL_PROFILER.current_open_block = anchor_index;
+        THREAD_PROFILER.with(|p| {
+            let mut profiler = p.borrow_mut();
+            let parent_index = profiler.current_open_block;
+            profiler.current_open_block = anchor_index;
+            {
+                let anchor = &mut profiler.anchors[anchor_index];
+                if anchor.hit_count == 0 {
+                    anchor.label = label;
+                }
+            }
+            let start_counter = profiler.read_current_metric();
+            let elapsed_inclusive_prev = profiler.anchors[anchor_index].elapsed_inclusive;
             Self {
-                label,
                 anchor_index,
                 parent_index,
-                start_counter: read_cpu_counter(),
-                elapsed_inclusive_prev: Profiler::metric_elapsed_inclusive(anchor_index),
+                start_counter,
+                elapsed_inclusive_prev,
             }
-        }
+        })
     }
 }
 
 impl Drop for ProfileBlock {
     fn drop(&mut self) {
-        let elapsed = read_cpu_counter() - self.start_counter;
-        unsafe {
-            // TODO: Why do I need to write it when dropping and not only when creating the block?
-            let anchor = &mut GLOBAL_PROFILER.anchors[self.anchor_index];
-            anchor.label = self.label;
-            anchor.elapsed_exclusive += elapsed as i64;
+        THREAD_PROFILER.with(|p| {
+            let mut profiler = p.borrow_mut();
+            let elapsed = profiler.read_current_metric() - self.start_counter;
+
+            let anchor = &mut profiler.anchors[self.anchor_index];
             anchor.hit_count += 1;
+            anchor.elapsed_exclusive += elapsed as i64;
             anchor.elapsed_inclusive = self.elapsed_inclusive_prev + elapsed;
+            anchor.elapsed_min = std::cmp::min(anchor.elapsed_min, elapsed);
+            anchor.elapsed_max = std::cmp::max(anchor.elapsed_max, elapsed);
 
             // Account for nested calls
-            GLOBAL_PROFILER.current_open_block = self.parent_index;
-            let parent = &mut GLOBAL_PROFILER.anchors[self.parent_index];
-            parent.elapsed_exclusive -= elapsed as i64
-        }
+            profiler.current_open_block = self.parent_index;
+            let parent = &mut profiler.anchors[self.parent_index];
+            parent.elapsed_exclusive -= elapsed as i64;
+        });
     }
 }

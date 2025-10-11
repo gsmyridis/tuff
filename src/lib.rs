@@ -10,3 +10,5 @@ pub use os::read_os_time;
 #[macro_use]
 pub mod profile;
 pub use profile::{ProfileBlock, Profiler};
+
+pub mod report;
