@@ -1,11 +1,9 @@
 use colored::{ColoredString, Colorize};
 
-#[cfg(feature = "profiling")]
 pub(crate) fn format_index<T: Into<String>>(index: T) -> ColoredString {
     index.into().truecolor(0x6b, 0xa5, 0xf8).bold()
 }
 
-#[cfg(feature = "profiling")]
 pub(crate) fn format_number(min: u64, max: u64, val: u64) -> ColoredString {
     if min == max {
         return format!("{val}").into();
@@ -20,7 +18,6 @@ pub(crate) fn format_number(min: u64, max: u64, val: u64) -> ColoredString {
     format!("{val}").truecolor(red, green, 170).bold()
 }
 
-#[cfg(feature = "profiling")]
 pub(crate) fn format_pct(min: f64, max: f64, val: f64) -> ColoredString {
     if min == max {
         return format!("{val:05.2}").into();

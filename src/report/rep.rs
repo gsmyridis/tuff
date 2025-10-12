@@ -118,7 +118,6 @@ impl ProfileReport {
         self.measurements.push(meas)
     }
 
-    #[cfg(feature = "profiling")]
     pub fn to_csv(&self, path: impl AsRef<std::path::Path>) -> io::Result<()> {
         let file = std::fs::File::create(path)?;
         let mut writer = std::io::BufWriter::new(file);
@@ -137,12 +136,6 @@ impl ProfileReport {
         Ok(())
     }
 
-    #[cfg(not(feature = "profiling"))]
-    pub fn to_csv(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    #[cfg(feature = "profiling")]
     pub fn print(self) -> io::Result<()> {
         let transposed = self.calculate_transpose();
 
@@ -202,15 +195,9 @@ impl ProfileReport {
                     transposed.range.max_value,
                     transposed.range.values[i],
                 )
-            )
-            .unwrap();
+            )?;
         }
         tabwriter.flush()
-    }
-
-    #[cfg(not(feature = "profiling"))]
-    pub fn print(self) -> io::Result<()> {
-        Ok(())
     }
 }
 

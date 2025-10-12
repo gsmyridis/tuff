@@ -11,6 +11,13 @@ thread_local! {
     static THREAD_PROFILER: RefCell<Profiler> = const {RefCell::new(Profiler::new())};
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct CallSite {
+    file: &'static str,
+    line: u32,
+    column: u32,
+}
+
 pub struct Profiler {
     current_open_block: usize,
     anchors: [ProfileAnchor; PROFILER_SIZE],
@@ -32,7 +39,6 @@ impl Profiler {
         }
     }
 
-    #[cfg(feature = "profiling")]
     pub fn start_global(metric_type: MetricType) {
         THREAD_PROFILER.with(|p| {
             let mut profiler = p.borrow_mut();
@@ -50,12 +56,6 @@ impl Profiler {
         }
     }
 
-    #[cfg(not(feature = "profiling"))]
-    pub fn start_global(metric_type: MetricType) {
-        // no-op
-    }
-
-    #[cfg(feature = "profiling")]
     pub fn stop_global() {
         THREAD_PROFILER.with(|p| {
             let mut profiler = p.borrow_mut();
@@ -63,12 +63,6 @@ impl Profiler {
         });
     }
 
-    #[cfg(not(feature = "profiling"))]
-    pub fn stop_global() {
-        // no-op
-    }
-
-    #[cfg(feature = "profiling")]
     pub fn report() -> ProfileReport {
         THREAD_PROFILER.with(|p| {
             let profiler = p.borrow();
@@ -103,14 +97,6 @@ impl Profiler {
 
             report
         })
-    }
-
-    #[cfg(not(feature = "profiling"))]
-    pub fn report() -> ProfileReport {
-        ProfileReport::new(
-            ProfileMetric::CpuCounter(Counter::from_cycles(0)),
-            ProfileMetric::CpuCounter(Counter::from_cycles(0)),
-        )
     }
 }
 

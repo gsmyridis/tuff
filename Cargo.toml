@@ -12,9 +12,6 @@ path = "src/lib.rs"
 name = "tuff"
 path = "src/bin/main.rs"
 
-[features]
-default = []
-profiling = []
 
 [dependencies]
 libc = "0.2.171"
