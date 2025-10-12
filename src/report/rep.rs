@@ -143,11 +143,14 @@ impl ProfileReport {
         let mut tabwriter = TabWriter::new(stdout).alignment(Alignment::Right);
         writeln!(
             &mut tabwriter,
-            "\n{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "\n{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             format_index("Label"),
+            format_index("Hit Count"),
             format_index("Elapsed Excl"),
+            format_index("Elapsed Excl Per Hit"),
             format_index("Proportion Excl"),
             format_index("Elapsed Incl"),
+            format_index("Elapsed Incl Per Hit"),
             format_index("Proportion Incl"),
             format_index("Minimum"),
             format_index("Maximum"),
@@ -158,12 +161,18 @@ impl ProfileReport {
         for i in 0..transposed.len() {
             writeln!(
                 &mut tabwriter,
-                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 format_index(self.measurements[i].label),
+                self.measurements[i].hit_count,
                 format_number(
                     transposed.elapsed_exclusive.min_value,
                     transposed.elapsed_exclusive.max_value,
                     transposed.elapsed_exclusive.values[i]
+                ),
+                format_number(
+                    transposed.elapsed_exclusive.min_value / self.measurements[i].hit_count,
+                    transposed.elapsed_exclusive.max_value / self.measurements[i].hit_count,
+                    transposed.elapsed_exclusive.values[i] / self.measurements[i].hit_count
                 ),
                 format_pct(
                     transposed.proportion_exclusive.min_value as f64,
@@ -174,6 +183,11 @@ impl ProfileReport {
                     transposed.elapsed_inclusive.min_value,
                     transposed.elapsed_inclusive.max_value,
                     transposed.elapsed_inclusive.values[i]
+                ),
+                format_number(
+                    transposed.elapsed_inclusive.min_value / self.measurements[i].hit_count,
+                    transposed.elapsed_inclusive.max_value / self.measurements[i].hit_count,
+                    transposed.elapsed_inclusive.values[i] / self.measurements[i].hit_count
                 ),
                 format_pct(
                     transposed.proportion_inclusive.min_value as f64,
