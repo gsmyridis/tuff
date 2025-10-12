@@ -9,6 +9,6 @@ pub use os::read_os_time;
 
 #[macro_use]
 pub mod profile;
-pub use profile::{ProfileBlock, Profiler};
+pub use profile::{CallSite, ProfileBlock, Profiler};
 
 pub mod report;

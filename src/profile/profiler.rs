@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use crate::arch::read_cpu_counter;
 use crate::metrics::{Counter, Duration, MetricType, ProfileMetric};
@@ -6,9 +7,10 @@ use crate::os::read_os_time;
 use crate::report::{Measurement, ProfileReport};
 
 const PROFILER_SIZE: usize = 1024;
+const ANCHOR_IDX_INIT: usize = 1;
 
 thread_local! {
-    static THREAD_PROFILER: RefCell<Profiler> = const {RefCell::new(Profiler::new())};
+    static THREAD_PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -18,9 +20,18 @@ pub struct CallSite {
     column: u32,
 }
 
+impl CallSite {
+    #[inline(always)]
+    pub const fn new(file: &'static str, line: u32, column: u32) -> Self {
+        Self { file, line, column }
+    }
+}
+
 pub struct Profiler {
     current_open_block: usize,
     anchors: [ProfileAnchor; PROFILER_SIZE],
+    anchors_map: HashMap<CallSite, usize>,
+    next_anchor_idx: usize,
 
     metric_type: MetricType,
     metric_init: Option<u64>,
@@ -28,12 +39,13 @@ pub struct Profiler {
 }
 
 impl Profiler {
-    const fn new() -> Self {
+    fn new() -> Self {
         Self {
             current_open_block: 0,
             anchors: [ProfileAnchor::new("Uninit"); PROFILER_SIZE],
+            anchors_map: HashMap::new(),
+            next_anchor_idx: ANCHOR_IDX_INIT,
             metric_type: MetricType::OsClock,
-
             metric_init: Some(0),
             metric_final: None,
         }
@@ -47,6 +59,14 @@ impl Profiler {
         });
     }
 
+    pub fn stop_global() {
+        THREAD_PROFILER.with(|p| {
+            let mut profiler = p.borrow_mut();
+            profiler.metric_final = Some(profiler.read_current_metric());
+        });
+    }
+
+    // TODO: Change this
     #[inline(always)]
     fn read_current_metric(&self) -> u64 {
         match self.metric_type {
@@ -56,11 +76,22 @@ impl Profiler {
         }
     }
 
-    pub fn stop_global() {
+    #[inline(always)]
+    pub fn get_or_insert(callsite: CallSite) -> usize {
         THREAD_PROFILER.with(|p| {
             let mut profiler = p.borrow_mut();
-            profiler.metric_final = Some(profiler.read_current_metric());
-        });
+            match profiler.anchors_map.get(&callsite) {
+                Some(idx) => *idx,
+                None => {
+                    let idx = profiler.next_anchor_idx;
+                    profiler.next_anchor_idx += 1;
+
+                    profiler.anchors_map.insert(callsite, idx);
+
+                    idx
+                }
+            }
+        })
     }
 
     pub fn report() -> ProfileReport {
