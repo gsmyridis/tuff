@@ -1,5 +1,5 @@
 #[cfg(target_os = "macos")]
-mod apple;
+pub mod apple;
 
 /// Returns an OS managed low resolution timer in nanoseconds.
 pub fn read_os_time() -> u64 {

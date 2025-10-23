@@ -1,32 +1,184 @@
-## Time stamp counter
+# Tuff
 
-### `RDTSC` & `RDTSCP`
+High resolution profiling made easy.
+This crate provides ultra-low-overhead primitives for measuring elapsed time and CPU cycles across operating systems and architectures.
+It also includes a convenient high-level profiler with reporting features.
+The goal is to easily, and accurately profile subsets of your program and get useful information to improve performance.
 
-## ARM
+**NOTE:** The crate is unstable depending on the features that are you use. Not all instructions are supported in all CPUs.
 
-Similarly on ARM there
+`tuff` aims to be a fine-grained instrumentation based profiling crate.
+It provides the building blocks to measure your time various granularity sourcing timestamps from either the hardware directly or the operating system, trying to avoid overhead and resolution deterioration.
+Additionally it provides out of the box profiler that is easy to use to display the results in an informative fashion.
 
-## MacOS
+# Usage
 
-For a long time `machTimestamp` has been in nanoseconds, so the Mach clock ticks occured once every nanosecond.
-However, with the new Apple Silicon Macs, this is not the case any more.
-The hardware clocks, Mach precision time, are affected by this change, but not local reference clocks.
+```rust
+    tuff::profile_block! { ["label", 0]
+        // Code
+    }
 
-On intel processors, that tick has been one nanosecond long, so working out a time interval has been all too easy.
+    tuff::profile_block! { ["label"]
+        // Code
+    }
 
-What we should be doing is apply a conversion factor to the difference in clock ticks, to convert from ticks
-to nanoseconds.
+    #[tuff::profile_function]
+    fn some_funtion() {
+        // Code
+    }
 
-For MacOS the numerator and denominator of `mach_timebase_info` are the same, and have been omitted.
-The correction may be large and different from model to model.
+    #[tuff::profile_function(0)]
+    fn some_funtion() {
+        // Code
+    }
+```
 
-https://developer.apple.com/documentation/driverkit/mach_timebase_info_t
+The difference between the two macros is that one takes only a label, while the other one also includes a number, the index to the `ProfileAnchor` node, which collects the information. The former one is easier to use, avoids any "collisions", but adds some overhead, since it searches for the index based on the call-site (file, line and column).
+So if you use the both variants, there is a chance that the results will not make much sense.
+A good practice would be to choose indexes with high numbers maybe start at 50, or 100, depending on the callsite numbers you have.
+
+## Unsafe code
+
+The crate uses unsafe code at many places, but this is necessary to avoid any unwanted overhead.
+
+# Feature Flags
+
+- coarse
+- experimental
+
+Conceptually what we want to do is simple. But, because of time evolution, variance between hardware vendors, or operating systems, it becomes more complicated.
+
+## Notes on profiling
+
+It is crucial to note that the act of measuring performance affects the perfomance of the system, almost always detiorating it.
+
+# Time measurement
+
+When profiling a program we always want to measure how long a program, or subset of it, is running.
+But there are different measures of code execution time, and different sources to retrieve these measures with different resolutions.
+For example, we could use a measure of wall-clock time (normal, every day time), or use number of CPU cycles as a measure.
+Ideally, we would use number of cycles as it is more representative of the code performance, but wall-clock time is also useful because we can intuit it better, and ultimately it is what a usual end user is interested in minimizing.
+
+## CPU Counters
+
+Modern CPUs contain hardware counters that record time or cycles.
+
+### Timestamp Counter in `x86`
+
+In the past, before [Intel Pentium](https://en.wikipedia.org/wiki/Pentium), processors did not keep time.
+The system relied on external timers such as [the real-time clock](https://en.wikipedia.org/wiki/Real-time_clock) or [programmable interval timer](https://en.wikipedia.org/wiki/Programmable_interval_timer).
+Reading these timers required I/O operations and gave coarse resolution (milliseconds).
+There were no CPU instructions to obtain high-resolution timestamps.
+
+Intel introduced the `RDTSC` instruction ([Read Timestamp Counter](https://en.wikipedia.org/wiki/Time_Stamp_Counter)), and its build-in Timestamp Counter (TSC), with the Pentium.
+`RDTSC` reads the TSC -- a 64-bit register that counts CPU cycles since reset.
+The instruction loads the low 32 bits in `EAX` and the high 32 bits in `EDX`, giving a monotonically increasing 64-bit value.
+In 64-bit systems (`x86-64`), for backwards compatibility, it still loads the values in `RAX` and `RDX` correspondigly, clearing the 32 higher bits.
+
+For a long time after its introduction TSC incremented once per CPU cycle.
+This was ideal for profiling as it captured very acurately how many CPU cycles elapsed during the execution of some code block, without any OS overhead.
+If you "sandwitch" a block of code between two `RDTSC` calls, the difference approximates the cycles taken:
+
+```asm
+RDTSC ; Read TSC at start
+      ; Execute instructions
+RDTSC ; Read TSC at end
+      ; Measure the difference
+```
+
+Unfortunately, with the instroduction of multi-core processors, this became more complicated.
+On multi-core or multi-cpu systems, the TSC values on different cores may not be synchronized.
+Programs measuring time on one core and finishing on another can get negative or inconsistent results.
+Additionally, power management features such as [SpeedStep](https://en.wikipedia.org/wiki/SpeedStep) or [Turbo Busting](https://www.intel.com/content/www/us/en/gaming/resources/turbo-boost.html) change the CPU frequency, so the counter's tick rate changes.
+Each core may run at a different frequency, leading to inconsistent cycle measurements.
+
+To solve these issues, Intel and AMD instroduced [constant](https://aakinshin.net/vignettes/tsc/#:~:text=Generation%202%3A%20Constant%20TSC) and [invariant](https://aakinshin.net/vignettes/tsc/#:~:text=Generation%203%3A%20Invariant%20TSC) TSCs.
+Constant TSC increments at a fixed rate regardless of core clock changes; however it might stop in deep sleep states.
+Invariant TSC runs at a constant rate in all power-management states.
+
+This means that `RDTSC` reads a monotonically increasing counter with constant frequency, which is essentially a high-resolution wall clock.
+
+TODO:CPUs still offer ways to get the number of cycles, but not
+
+We can still count cycles (RDPRU?) RDPMC if you can do some priviliged operations. But RDTSC is the only thing you can count on calling in userspace.
+The other instructions would depend on the specific CPU, whether the OS allows you to call these instructions, some might need specific drivers etc.
+RDTSC is not the best thing to use for profiling, it's a high resolution wall clock, but you can always count on.
+RDTSC is that, basically a wall clock, but we would like to convert it to units we are used to, like milliseconds etc.
+The expected things would be to also have an instruction that gives you the TSC counter, but not all vendors have it or document it at least.
+CPUID 15h?
+How to detect constant_tsc and nonstop_tsc flags in /proc/cpuinfo in Linux. How else?
+A way to do it is use an OS process with known wall clock time, time it in TSC ticks and estimate the frequency.
+QueryPerformanceCounter, QueryPerformanceFrequency
+
+#### Additional References
+
+- Section 21.7 in [Intel64 and IA-32 Architectures Software Developer's Manual](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
+
+### Generic Timer in ARM
+
+The [Generic Timer](https://tc.gts3.org/cs3210/2020/spring/r/aarch64-generic-timer.pdf) provides a standardized timer framework for Arm cores.
+It includes a System Counter and set of per-core timers.
+The System Counter is an always-on device, which provides a fixed frequency incrementing system count.
+The system count value is broadcast to all the cores in the system, giving the cores a common view of the passage of time.
+The system count value increments with [frequency](https://developer.arm.com/documentation/ka005977/1-0/?lang=en) typically in the range of 1MHz to 50MHz.
+
+The `CNTPCT_EL0` system register reports the current system count value.
+Similarly to `RDTSC`, reads to `CNTPCT_EL0` can be made speculatively.
+This means that they can be read out of order regarding the program flow.
+This could be important depending on your usecase.
+We can serialize the read instruction with an `ISB` fence, like in the following code:
+
+```armsm
+loop:
+  LDR X1, [X2]
+  CBZ X1, loop
+  ISB
+  MRS X1, CNTPCT_EL0
+```
+
+`CNTFRQ_EL0` reports the frequency of the system count.
+However, this register is not populated by hardware.
+The register is write-able at the highest implemented Exception level (EL) and readable at all Exception levels.
+Firmware, typically running at EL3, populates this register as part of early system initialization.
+Higher-level software, like an operating system, can then use the register to get the frequency.
+
+#### Additional References
+
+- [ARM Architecture Reference Manual](https://developer.arm.com/documentation/ddi0406/cd/?lang=en)
+
+## OS Clocks
+
+Operating systems provide stable and high-resolution ways to measure time.
+These system clocks typically rely on hardware counters (like TSC, or the System Counter) that increment at a constant rate.
+
+### MacOS
+
+MacOS provides several APIs for retrieving monotonic clock values, with the most common low-level interfaces being [`mach_absolute_time`](https://developer.apple.com/documentation/driverkit/mach_absolute_time) and [`mach_continuous_time`](https://developer.apple.com/documentation/driverkit/mach_continuous_time).
+Both `mach_continuous_time` and `mach_absolute_time` return current value of a clock that increments monotonically in tick units.
+The difference is that the former includes any the time the system might have slept, while the latter does not.
+Therefore, `mach_continuous_time` is important for keeping time, while `mach_absolute_time` is more appropriate for performance profiling.
+
+It’s important to note that the value returned by the Mach time functions is expressed in clock ticks, not nanoseconds.
+Historically, `machTimestamp` values effectively represented nanoseconds, because on Intel-based Macs each Mach clock tick corresponded to one nanosecond.
+However, on Apple Silicon systems, this is no longer true.
+The tick frequency of the underlying hardware timer—used for Mach’s high-precision timekeeping—now differs from one nanosecond per tick.
+
+On Intel processors, converting time intervals was straightforward since one tick equaled one nanosecond.
+On Apple Silicon, you must instead apply a conversion factor to [convert](https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code#Apply-Timebase-Information-to-Mach-Absolute-Time-Values) from ticks to nanoseconds.
+This conversion factor is provided by the [`mach_timebase_info`](https://developer.apple.com/documentation/driverkit/mach_timebase_info_t) structure.
+While on macOS the numerator and denominator are often equal (making the factor effectively one), on other systems—or future models—these values may differ significantly.
+As a result, the correction can vary across hardware models and may be substantial.
+
+Additionally, macOS implements the standard POSIX time APIs (clock_gettime, etc.), but internally these functions call into the Mach time services for their implementation.
+Therefore, in `tuff` we use `mach_absolute_time()` directly to avoid any additional overhead.
+
+<!--#### Additional References
+
 https://developer.apple.com/library/archive/qa/qa1398/_index.html
-https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code
 https://eclecticlight.co/2020/09/08/changing-the-clock-in-apple-silicon-macs/
-https://eclecticlight.co/2017/02/23/so-many-times-the-clocks-in-your-mac/
+https://eclecticlight.co/2017/02/23/so-many-times-the-clocks-in-your-mac/-->
 
-### `mach_absolute_time`
+<!--### `mach_absolute_time`
 
 `x86_64`
 
@@ -101,4 +253,4 @@ otool -tv /usr/lib/system/libsystem_kernel.dylib | grep "_mach_absolute_time:" -
 00000000000013f0        b.ne    0x13e0
 00000000000013f4        add     x0, x0, x1
 00000000000013f8        ret
-```
+```-->
