@@ -7,10 +7,6 @@ The goal is to easily, and accurately profile subsets of your program and get us
 
 **NOTE:** The crate is unstable depending on the features that are you use. Not all instructions are supported in all CPUs.
 
-`tuff` aims to be a fine-grained instrumentation based profiling crate.
-It provides the building blocks to measure your time various granularity sourcing timestamps from either the hardware directly or the operating system, trying to avoid overhead and resolution deterioration.
-Additionally it provides out of the box profiler that is easy to use to display the results in an informative fashion.
-
 # Usage
 
 ```rust
@@ -37,14 +33,13 @@ The difference between the two macros is that one takes only a label, while the 
 So if you use the both variants, there is a chance that the results will not make much sense.
 A good practice would be to choose indexes with high numbers maybe start at 50, or 100, depending on the callsite numbers you have.
 
-## Unsafe code
-
-The crate uses unsafe code at many places, but this is necessary to avoid any unwanted overhead.
-
 # Feature Flags
 
 - coarse
-- experimental
+- os
+- cpu-counter
+- cpu-counter-serialized
+- m-experimental
 
 Conceptually what we want to do is simple. But, because of time evolution, variance between hardware vendors, or operating systems, it becomes more complicated.
 
@@ -98,7 +93,7 @@ Invariant TSC runs at a constant rate in all power-management states.
 
 This means that `RDTSC` reads a monotonically increasing counter with constant frequency, which is essentially a high-resolution wall clock.
 
-TODO:CPUs still offer ways to get the number of cycles, but not
+<!--TODO:CPUs still offer ways to get the number of cycles, but not
 
 We can still count cycles (RDPRU?) RDPMC if you can do some priviliged operations. But RDTSC is the only thing you can count on calling in userspace.
 The other instructions would depend on the specific CPU, whether the OS allows you to call these instructions, some might need specific drivers etc.
@@ -108,7 +103,7 @@ The expected things would be to also have an instruction that gives you the TSC 
 CPUID 15h?
 How to detect constant_tsc and nonstop_tsc flags in /proc/cpuinfo in Linux. How else?
 A way to do it is use an OS process with known wall clock time, time it in TSC ticks and estimate the frequency.
-QueryPerformanceCounter, QueryPerformanceFrequency
+QueryPerformanceCounter, QueryPerformanceFrequency-->
 
 #### Additional References
 
@@ -120,15 +115,20 @@ The [Generic Timer](https://tc.gts3.org/cs3210/2020/spring/r/aarch64-generic-tim
 It includes a System Counter and set of per-core timers.
 The System Counter is an always-on device, which provides a fixed frequency incrementing system count.
 The system count value is broadcast to all the cores in the system, giving the cores a common view of the passage of time.
-The system count value increments with [frequency](https://developer.arm.com/documentation/ka005977/1-0/?lang=en) typically in the range of 1MHz to 50MHz.
+The system count value increments with [frequency](https://developer.arm.com/documentation/ka005977/1-0/?lang=en) typically in the range of 1MHz to 50MHz, or 1GHz (effective) more recently.
 
-The `CNTPCT_EL0` system register reports the current system count value.
-Similarly to `RDTSC`, reads to `CNTPCT_EL0` can be made speculatively.
+Each core has two types of timers, a physical and a virtual.
+Physical timers, compare against the counter value of the System Counter.
+This value is referred to as the physical count and is reported by `CNTPCT_EL0`.
+Virtual timers compare against a virtual count, which is calculated as the physical count minus some offset, and is reported by `CNTVCT_EL0`.
+This offset can be specified in a register which is only accessible to EL2 and EL3.
+
+Similarly to `RDTSC`, reads to `CNTPCT_EL0` or `CNTVCT_EL0` can be made speculatively.
 This means that they can be read out of order regarding the program flow.
 This could be important depending on your usecase.
 We can serialize the read instruction with an `ISB` fence, like in the following code:
 
-```armsm
+```asm
 loop:
   LDR X1, [X2]
   CBZ X1, loop
