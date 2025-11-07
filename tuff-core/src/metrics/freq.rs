@@ -12,14 +12,6 @@ impl Frequency {
         Self(freq)
     }
 
-    pub fn from_hertz(freq: u64) -> Self {
-        Self(freq)
-    }
-
-    pub fn from_gigas(freq: u64) -> Self {
-        Self(freq * GIGAS_IN_HERTZ)
-    }
-
     pub fn in_hertz(&self) -> u64 {
         self.0
     }

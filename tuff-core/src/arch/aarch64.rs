@@ -11,6 +11,7 @@ pub fn cntfrq_el0() -> u64 {
     freq
 }
 
+/// Reads the virtual
 #[inline(always)]
 pub fn cntvct_el0() -> u64 {
     let cnt: u64;

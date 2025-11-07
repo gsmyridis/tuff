@@ -19,10 +19,8 @@ pub fn mach_timebase_info() -> (u32, u32) {
 }
 
 pub fn mach_absolute_time_nanos() -> u64 {
-    let ticks = unsafe { mach_time::mach_absolute_time() }; // just the FFI call is unsafe
+    let ticks = unsafe { mach_time::mach_absolute_time() };
     let (numer, denom) = mach_timebase_info();
-
-    // integer math: (ticks * numer) / denom, widened to avoid overflow
     let ns = (ticks as u128).saturating_mul(numer as u128) / (denom as u128);
     ns as u64
 }
