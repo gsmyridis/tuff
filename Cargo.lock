@@ -157,7 +157,6 @@ dependencies = [
  "features",
  "quote",
  "syn",
- "tuff-core",
 ]
 
 [[package]]

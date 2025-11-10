@@ -6,16 +6,16 @@ use syn::{ItemFn, parse_macro_input};
 pub fn profile_fn(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_item = parse_macro_input!(item as ItemFn);
     let fn_sig = &fn_item.sig;
+    let label = format!("fn::{}", fn_sig.ident);
     let fn_block_stmts = &fn_item.block.stmts;
 
     let expanded = quote! {
         #fn_sig {
-            use tuff_core;
             let __idx = {
-                const __CALL_SITE: tuff_core::CallSite = tuff_core::CallSite::new(file!(), line!(), column!());
-                tuff_core::Profiler::get_or_insert(__CALL_SITE)
+                static __CALLSITE_ID: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+                *__CALLSITE_ID.get_or_init(|| ::tuff::Profiler::next_id())
             };
-            let __block = tuff_core::ProfileBlock::new("", __idx);
+            let __block = ::tuff::ProfileBlock::new(#label, __idx);
 
             #(#fn_block_stmts)*
         }
