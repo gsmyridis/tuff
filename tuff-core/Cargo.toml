@@ -12,4 +12,4 @@ colored = "3.0.0"
 hashbrown = "0.16.0"
 tabwriter = { version = "1.4.1", features = ["ansi_formatting"] }
 
-paste = "1.0.15"
+paste = { workspace = true }
