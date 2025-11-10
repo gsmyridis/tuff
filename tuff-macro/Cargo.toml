@@ -11,4 +11,5 @@ features = "0.10.0"
 quote = "1.0.41"
 syn = { version = "2.0.108", features = ["full"] }
 
-tuff-core = {path = "../tuff-core"}
+
+paste = "1.0.15"

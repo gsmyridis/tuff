@@ -12,3 +12,6 @@ pub mod profile;
 pub use profile::{CallSite, ProfileBlock, Profiler};
 
 pub mod report;
+
+// Re-exports
+pub use paste;

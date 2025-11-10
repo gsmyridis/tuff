@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 use crate::arch::read_cpu_counter;
 use crate::metrics::{Counter, Duration, MetricType, ProfileMetric};
@@ -7,10 +6,10 @@ use crate::os::read_os_time;
 use crate::report::{Measurement, ProfileReport};
 
 const PROFILER_SIZE: usize = 1024;
-const ANCHOR_IDX_INIT: usize = 1;
 
 thread_local! {
     static THREAD_PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
+    static LOCAL_INDEX: RefCell<usize> = RefCell::new(1);
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -30,8 +29,6 @@ impl CallSite {
 pub struct Profiler {
     current_open_block: usize,
     anchors: [ProfileAnchor; PROFILER_SIZE],
-    anchors_map: HashMap<CallSite, usize>,
-    next_anchor_idx: usize,
 
     metric_type: MetricType,
     metric_init: Option<u64>,
@@ -43,12 +40,18 @@ impl Profiler {
         Self {
             current_open_block: 0,
             anchors: [ProfileAnchor::new("Uninit"); PROFILER_SIZE],
-            anchors_map: HashMap::new(),
-            next_anchor_idx: ANCHOR_IDX_INIT,
             metric_type: MetricType::OsClock,
             metric_init: Some(0),
             metric_final: None,
         }
+    }
+
+    pub fn next_id() -> usize {
+        LOCAL_INDEX.with_borrow_mut(|index| {
+            let current_index = *index;
+            *index += 1;
+            current_index
+        })
     }
 
     pub fn start_global(metric_type: MetricType) {
@@ -74,24 +77,6 @@ impl Profiler {
             MetricType::CpuCounter => read_cpu_counter(),
             MetricType::CpuCounterSerialized => todo!(),
         }
-    }
-
-    #[inline(always)]
-    pub fn get_or_insert(callsite: CallSite) -> usize {
-        THREAD_PROFILER.with(|p| {
-            let mut profiler = p.borrow_mut();
-            match profiler.anchors_map.get(&callsite) {
-                Some(idx) => *idx,
-                None => {
-                    let idx = profiler.next_anchor_idx;
-                    profiler.next_anchor_idx += 1;
-
-                    profiler.anchors_map.insert(callsite, idx);
-
-                    idx
-                }
-            }
-        })
     }
 
     pub fn report() -> ProfileReport {

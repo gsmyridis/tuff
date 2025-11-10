@@ -5,3 +5,6 @@ members = [
     "tuff-macro",
 ]
 resolver = "2"
+
+[workspace.dependencies]
+paste = "1.0.15"
