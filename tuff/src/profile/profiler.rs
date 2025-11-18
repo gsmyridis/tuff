@@ -9,7 +9,7 @@ const PROFILER_SIZE: usize = 1024;
 
 thread_local! {
     static THREAD_PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
-    static LOCAL_INDEX: RefCell<usize> = RefCell::new(1);
+    static LOCAL_INDEX: RefCell<usize> = const {RefCell::new(1) };
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
