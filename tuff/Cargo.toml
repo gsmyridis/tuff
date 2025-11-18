@@ -6,3 +6,8 @@ edition = "2024"
 [dependencies]
 tuff-macro = {path = "../tuff-macro"}
 tuff-core = {path = "../tuff-core"}
+
+colored = "3.0.0"
+tabwriter = { version = "1.4.1", features = ["ansi_formatting"] }
+
+paste = { workspace = true }

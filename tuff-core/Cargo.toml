@@ -8,8 +8,3 @@ readme = "README.md"
 libc = "0.2.171"
 mach2 = "0.4.2"
 raw-cpuid = "11.5.0"
-colored = "3.0.0"
-hashbrown = "0.16.0"
-tabwriter = { version = "1.4.1", features = ["ansi_formatting"] }
-
-paste = { workspace = true }
